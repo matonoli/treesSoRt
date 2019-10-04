@@ -150,6 +150,8 @@ int main(int argc, const char **argv) {
 
 		Int_t nChargedFinal = 0;
 		Int_t nChargedFinalRec = 0;
+		std::vector<Double_t> phis;
+		std::vector<Double_t> phisRec;
 
 		// Particle loop
 		for (int iP = 0; iP < pythia.event.size(); ++iP)	{
@@ -201,6 +203,7 @@ int main(int argc, const char **argv) {
 
 			// calculate rt generated
 			if (chargedFinal) {
+				phis.push_back(p.phi());
 				if (p.pT() > evPtLeadgen) {
 					evPtLeadgen = p.pT();
 					evPhiLeadgen = p.phi();
@@ -209,6 +212,7 @@ int main(int argc, const char **argv) {
 			}
 			// calculate rt reconstructed
 			if (chargedFinalRec) {
+				phisRec.push_back(p.phi());
 				if (p.pT() > evPtLeadrec) {
 					evPtLeadrec = p.pT();
 					evPhiLeadrec = p.phi();
@@ -226,6 +230,12 @@ int main(int argc, const char **argv) {
 		if (nChargedFinalRec > minTracks) {
 			evSo[rec] = TS[rec]->GetTransverseSpherocityTracks();
 			evSo[recNoPt] = TS[recNoPt]->GetTransverseSpherocityTracks();
+		}
+		if (evPtLeadgen > ptLeadCut) {
+			for (auto iPhi : phis) if (isTrans(iPhi,evPhiLeadgen)) nTransCh++;
+		}
+		if (evPtLeadrec > ptLeadCut) {
+			for (auto iPhi : phisRec) if (isTrans(iPhi,evPhiLeadrec)) nTransChRec++;
 		}
 		
 		
