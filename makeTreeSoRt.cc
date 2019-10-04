@@ -31,6 +31,32 @@ bool isStrange(Int_t pdg) {
 		if ( TMath::Abs(pdg) == strangePDGs[iS] ) return true;	}
 	return false;
 }
+double DeltaPhi(Double_t phi1, Double_t phi2) {
+	
+	Double_t dphi = phi2 - phi1;
+	if ( dphi > TMath::Pi() )		dphi = dphi - 2*TMath::Pi();
+	if ( dphi < -1.*TMath::Pi() )	dphi = dphi + 2*TMath::Pi();
+
+	return dphi;
+}
+
+bool IsTrans(Double_t phi1, Double_t phiTrig) {
+
+	Double_t dphi = DeltaPhi(phi1,phiTrig);
+	if (TMath::Abs(dphi) < TMath::Pi()/3.) 		return false;
+	if (TMath::Abs(dphi) > 2.*TMath::Pi()/3.) 	return false;
+	
+	return true;
+}
+
+int WhatRegion(Double_t phi1, Double_t phiTrig) {
+
+	Double_t dphi = DeltaPhi(phi1,phiTrig);
+	
+	if (TMath::Abs(dphi) < TMath::Pi()/3.)			return 1;
+	else if (TMath::Abs(dphi) > 2.*TMath::Pi()/3.) 	return 2;
+	else return 0;
+}
 
 int main(int argc, const char **argv) {
 
@@ -120,17 +146,21 @@ int main(int argc, const char **argv) {
     		Form("evSo%s/f",TSnames[iTS]));
     }
     Float_t evPtLeadgen;
-    tree->Branch("evPtLeadgen", &evPtLeadgen, "evPtLeadgen/f");
+    tree->Branch("evPtLeadgen", &evPtLeadgen, "evPtLeadgen/F");
     Float_t evPhiLeadgen;
-    tree->Branch("evPhiLeadgen", &evPhiLeadgen, "evPhiLeadgen/f");
+    tree->Branch("evPhiLeadgen", &evPhiLeadgen, "evPhiLeadgen/F");
     Float_t evEtaLeadgen;
-    tree->Branch("evEtaLeadgen", &evEtaLeadgen, "evEtaLeadgen/f");
+    tree->Branch("evEtaLeadgen", &evEtaLeadgen, "evEtaLeadgen/F");
     Float_t evPtLeadrec;
-    tree->Branch("evPtLeadrec", &evPtLeadrec, "evPtLeadrec/f");
+    tree->Branch("evPtLeadrec", &evPtLeadrec, "evPtLeadrec/F");
     Float_t evPhiLeadrec;
-    tree->Branch("evPhiLeadrec", &evPhiLeadrec, "evPhiLeadrec/f");
+    tree->Branch("evPhiLeadrec", &evPhiLeadrec, "evPhiLeadrec/F");
     Float_t evEtaLeadrec;
-    tree->Branch("evEtaLeadrec", &evEtaLeadrec, "evEtaLeadrec/f");
+    tree->Branch("evEtaLeadrec", &evEtaLeadrec, "evEtaLeadrec/F");
+    Int_t evNchTrans;
+    tree->Branch("evNchTrans", &evNchTrans, "evNchTrans/I");
+    Int_t evNchTransRec;
+    tree->Branch("evNchTransRec", &evNchTransRec, "evNchTransRec/I");
 
 	// Event loop
 	int   nRealEvents = 0;
@@ -147,9 +177,12 @@ int main(int argc, const char **argv) {
 		}
 		evPtLeadgen = -1.; evPhiLeadgen = 0; evEtaLeadgen = 0;
 		evPtLeadrec = -1.; evPhiLeadrec = 0; evEtaLeadrec = 0;
+		evNchTrans = -1; evNchTransRec = -1;
 
 		Int_t nChargedFinal = 0;
 		Int_t nChargedFinalRec = 0;
+		Int_t nTransCh = 0;
+		Int_t nTransChRec = 0;
 		std::vector<Double_t> phis;
 		std::vector<Double_t> phisRec;
 
@@ -232,10 +265,17 @@ int main(int argc, const char **argv) {
 			evSo[recNoPt] = TS[recNoPt]->GetTransverseSpherocityTracks();
 		}
 		if (evPtLeadgen > ptLeadCut) {
-			for (auto iPhi : phis) if (isTrans(iPhi,evPhiLeadgen)) nTransCh++;
+			for (auto iPhi : phis) if (IsTrans(iPhi,evPhiLeadgen)) nTransCh++;
+
+				//cout << "ntr " << nTransCh << endl;
+				//cout << "ev " << evNchTrans << endl;
+			
+			evNchTrans = nTransCh;
 		}
 		if (evPtLeadrec > ptLeadCut) {
-			for (auto iPhi : phisRec) if (isTrans(iPhi,evPhiLeadrec)) nTransChRec++;
+			for (auto iPhi : phisRec) if (IsTrans(iPhi,evPhiLeadrec)) nTransChRec++;
+			
+			evNchTransRec = nTransChRec;
 		}
 		
 		

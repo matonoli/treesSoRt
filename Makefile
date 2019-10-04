@@ -60,7 +60,7 @@ all:
 	$@.cc -o $@.exe \
 	-L$(PYTHIA_LIBDIR) -lpythia8 \
 	$(ROOTLIBS) -lEG \
-	TransverseSpherocity/TransverseSpherocity_cxx.so
+	TransverseSpherocity/TransverseSpherocity_cxx.so #-g
 
 
 # Clean up: remove executables and outdated files.
