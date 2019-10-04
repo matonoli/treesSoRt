@@ -18,6 +18,7 @@
 #include <TRandom3.h>
 
 #include "TransverseSpherocity/TransverseSpherocity.h"
+#include "MyTParticle.h"
 
 using namespace std;
 using namespace Pythia8;
@@ -138,7 +139,7 @@ int main(int argc, const char **argv) {
 	// Create tree and branches
 	TTree* tree = new TTree("tree", "PYTHIA Track Tree");
 	const Int_t maxSize = 10e3;					// max size of particle arrays / event
-	TClonesArray trackArray("TParticle", maxSize);
+	TClonesArray trackArray("MyTParticle", maxSize);
 	tree->Branch("tracks", &trackArray);		// why bronch?
     Float_t evSo[TSsize];
     for (int iTS = 0; iTS < TSsize; iTS++)	{
@@ -197,13 +198,13 @@ int main(int argc, const char **argv) {
 	  		if ( isStrange(p.id()) ) 	saveTrack = true;		//save final-state strangeness: phi, K0s, L, Xi, Omega
 	  		if (TMath::Abs(p.id()) == 111)	saveTrack = true;	// save also pi0
 	  		if (!saveTrack) continue;	
-
-			TParticle* track =	new( trackArray[nTr++] ) TParticle();
+	  		
+			MyTParticle* track =	new( trackArray[nTr++] ) MyTParticle();
 			track->SetPdgCode(p.id());
 			track->SetFirstMother(p.mother1());
 	  		track->SetLastMother(pythia.event[p.mother1()].id());	// storing mother PDG as last mother :-X
 	  		track->SetFirstDaughter(p.daughter1());
-	  		track->SetLastDaughter(pythia.event[p.daughter1()].id());	// storing daughter PDG as last daughter :-X
+	  		track->SetLastDaughter(pythia.event[p.daughter1()].id());	
 			track->SetMomentum(p.px(), p.py(), p.pz(), p.e());
 			track->SetProductionVertex(p.xProd(), p.yProd(), p.zProd(), p.tProd());
 
@@ -222,6 +223,7 @@ int main(int argc, const char **argv) {
 			for (int iPdg = 0; iPdg < 3; iPdg++) {	// for pi,k,p only, non-finals need a different approach
 				if (TMath::Abs(PDGs[iPdg])==p.id()) isReco = ( mcRec < pEffi[iPdg]->Eval(p.pT()) );
 			}
+			track->SetIsReco(isReco);
 
 			// reconstructed
 			Bool_t chargedFinalRec = chargedFinal && isReco;
@@ -254,7 +256,17 @@ int main(int argc, const char **argv) {
 			}
 
 		}
-	
+
+
+		for (int iP = 0; iP < trackArray.GetEntries(); iP++) {
+			MyTParticle* track = (MyTParticle*)trackArray[iP];
+			Int_t pdgCode = track->GetPdgCode();
+			for (int iPdg = 3; iPdg < partSize; ++iPdg)
+			{
+				if (track->GetPdgCode()==)	// STOPPED HERE, NEEDS TO CALC. IF RECO FOR NONFINALS
+			}
+		}
+
 		// Fill other event info
 		if (nChargedFinal > minTracks) {
 			evSo[gen] = TS[gen]->GetTransverseSpherocityTracks();
@@ -266,15 +278,10 @@ int main(int argc, const char **argv) {
 		}
 		if (evPtLeadgen > ptLeadCut) {
 			for (auto iPhi : phis) if (IsTrans(iPhi,evPhiLeadgen)) nTransCh++;
-
-				//cout << "ntr " << nTransCh << endl;
-				//cout << "ev " << evNchTrans << endl;
-			
 			evNchTrans = nTransCh;
 		}
 		if (evPtLeadrec > ptLeadCut) {
 			for (auto iPhi : phisRec) if (IsTrans(iPhi,evPhiLeadrec)) nTransChRec++;
-			
 			evNchTransRec = nTransChRec;
 		}
 		

@@ -54,13 +54,21 @@ all:
 	@echo $(PYTHIA_INCDIR)
 	@echo $(ROOTLIBS)
 
+# Compile custom classes
+%:  %.cxx $(PYTHIA_LIBDIR)/libpythia8.so
+	$(CXX) $(CXXFLAGS) $(ROOTCFLAGS) -I$(PYTHIA_INCDIR) \
+	$@.cxx  \
+	-L$(PYTHIA_LIBDIR) -lpythia8 \
+	$(ROOTLIBS) -lEG
+
 # Create an executable for one of the normal test programs
 %:	%.cc $(PYTHIA_LIBDIR)/libpythia8.so #dependencies
 	$(CXX) $(CXXFLAGS) $(ROOTCFLAGS) -I$(PYTHIA_INCDIR) \
 	$@.cc -o $@.exe \
 	-L$(PYTHIA_LIBDIR) -lpythia8 \
 	$(ROOTLIBS) -lEG \
-	TransverseSpherocity/TransverseSpherocity_cxx.so #-g
+	TransverseSpherocity/TransverseSpherocity_cxx.so \
+	MyTParticle_cxx.so #-g
 
 
 # Clean up: remove executables and outdated files.
