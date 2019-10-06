@@ -18,7 +18,6 @@
 #include <TRandom3.h>
 
 #include "TransverseSpherocity/TransverseSpherocity.h"
-#include "MyTParticle.h"
 
 using namespace std;
 using namespace Pythia8;
@@ -85,7 +84,7 @@ int main(int argc, const char **argv) {
 	const Int_t minTracks = 10;
 	const Float_t cutEta = 0.8;
 	const Float_t ptLeadCut = 5.0;
-	enum { pi, k, p, k0s, l, phi, xi, partSize};
+	enum { pi, k, p, k0s, l, xi, phi, partSize};
 	int PDGs[partSize] = { 211, 321, 2212, 310, 3122, 333, 3312 };
 	TF1* pEffi[partSize];
 	pEffi[pi]	= new TF1("pi_pos_Eff", "(x>=0&&x<0.2)*(0.65)+(x>=0.2&&x<[0])*([1]+x*[2])+(x>=[0]&&x<[3])*([4]+[5]*x+[6]*x*x)+(x>=[3])*([7])", 0.0, 20.0);
@@ -98,10 +97,10 @@ int main(int argc, const char **argv) {
 	pEffi[k0s]->SetParameters(-7.17967e-01,1.27198e-01,1.51269e-02,5.19441e-01,0.1);
 	pEffi[l] 	= new TF1("pEffi_l","([0]*x^[1]*exp(-x) - [2]*x+[3])*(x>[4])", 0, 20);
 	pEffi[l]->SetParameters(-5.46924e-01,8.50191e-03,1.49558e-02,3.96383e-01,0.35);
-	pEffi[phi]	= new TF1("pEffi_phi","([0]*x^[1]*exp(-x) - [2]*x +[3])*(x>[4])", 0, 20);
-	pEffi[phi]->SetParameters(-5.25411e-01,5.42076e-02,-2.99137e-03,3.03124e-01,2.77814e-02); 
 	pEffi[xi]	= new TF1("xiEff", "0*(x<[0]) + ([1]*(x-[0])+[2]*(x-[0])*(x-[0]))*([0]<=x&&x<[3]) +[4]*(1-[5]/x)*([3]<=x)", 0.0, 20.0);
 	pEffi[xi]->SetParameters(0.643, 0.114, -0.00594, 3.06, 0.283, 0.489);
+	pEffi[phi]	= new TF1("pEffi_phi","([0]*x^[1]*exp(-x) - [2]*x +[3])*(x>[4])", 0, 20);
+	pEffi[phi]->SetParameters(-5.25411e-01,5.42076e-02,-2.99137e-03,3.03124e-01,2.77814e-02); 
 	for (int iF = 0; iF < partSize; iF++) pEffi[iF]->Write();
 
 
@@ -139,7 +138,7 @@ int main(int argc, const char **argv) {
 	// Create tree and branches
 	TTree* tree = new TTree("tree", "PYTHIA Track Tree");
 	const Int_t maxSize = 10e3;					// max size of particle arrays / event
-	TClonesArray trackArray("MyTParticle", maxSize);
+	TClonesArray trackArray("TParticle", maxSize);
 	tree->Branch("tracks", &trackArray);		// why bronch?
     Float_t evSo[TSsize];
     for (int iTS = 0; iTS < TSsize; iTS++)	{
@@ -186,6 +185,7 @@ int main(int argc, const char **argv) {
 		Int_t nTransChRec = 0;
 		std::vector<Double_t> phis;
 		std::vector<Double_t> phisRec;
+		std::vector<Int_t> vecPhiDaughters;
 
 		// Particle loop
 		for (int iP = 0; iP < pythia.event.size(); ++iP)	{
@@ -199,7 +199,7 @@ int main(int argc, const char **argv) {
 	  		if (TMath::Abs(p.id()) == 111)	saveTrack = true;	// save also pi0
 	  		if (!saveTrack) continue;	
 	  		
-			MyTParticle* track =	new( trackArray[nTr++] ) MyTParticle();
+			TParticle* track =	new( trackArray[nTr++] ) TParticle();
 			track->SetPdgCode(p.id());
 			track->SetFirstMother(p.mother1());
 	  		track->SetLastMother(pythia.event[p.mother1()].id());	// storing mother PDG as last mother :-X
@@ -221,9 +221,20 @@ int main(int argc, const char **argv) {
 			Double_t mcRec = random->Uniform(0.,1.);
 			Bool_t isReco = false;
 			for (int iPdg = 0; iPdg < 3; iPdg++) {	// for pi,k,p only, non-finals need a different approach
+				if (TMath::Abs(p.id())==PDGs[iPdg]) isReco = ( mcRec < pEffi[iPdg]->Eval(p.pT()) );
+				if (TMath::Abs(p.id())==PDGs[k] && TMath::Abs(pythia.event[p.mother1()].id()) == PDGs[phi] )
+					vecPhiDaughters.push_back(nTr-1);
+			}
+
+			// v0s, cascades (daughters not reconstructable as primary)
+			for (int iPdg = 3; iPdg < partSize-1; iPdg++) {	
 				if (TMath::Abs(PDGs[iPdg])==p.id()) isReco = ( mcRec < pEffi[iPdg]->Eval(p.pT()) );
 			}
-			track->SetIsReco(isReco);
+
+			// resonances (daughters reconstructed as primaries)
+			// done after particle loop
+					
+			track->SetStatus(isReco);
 
 			// reconstructed
 			Bool_t chargedFinalRec = chargedFinal && isReco;
@@ -259,11 +270,14 @@ int main(int argc, const char **argv) {
 
 
 		for (int iP = 0; iP < trackArray.GetEntries(); iP++) {
-			MyTParticle* track = (MyTParticle*)trackArray[iP];
+			TParticle* track = (TParticle*)trackArray[iP];
 			Int_t pdgCode = track->GetPdgCode();
-			for (int iPdg = 3; iPdg < partSize; ++iPdg)
+			for (int iPdg = phi; iPdg < partSize; ++iPdg)
 			{
-				if (track->GetPdgCode()==)	// STOPPED HERE, NEEDS TO CALC. IF RECO FOR NONFINALS
+				if (TMath::Abs(track->GetPdgCode())==PDGs[iPdg])
+				Bool_t isReco = true;
+				for (auto iD : vecPhiDaughters ) isReco = isReco && (TParticle*)trackArray[iD].GetStatus();
+				track.SetStatus(isReco);		// think about this and add some error messages if ndaughters != 2 
 			}
 		}
 
