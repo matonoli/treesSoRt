@@ -85,7 +85,7 @@ int main(int argc, const char **argv) {
 	const Float_t cutEta = 0.8;
 	const Float_t ptLeadCut = 5.0;
 	enum { pi, k, p, k0s, l, xi, phi, partSize};
-	int PDGs[partSize] = { 211, 321, 2212, 310, 3122, 333, 3312 };
+	int PDGs[partSize] = { 211, 321, 2212, 310, 3122, 3312, 333 };
 	TF1* pEffi[partSize];
 	pEffi[pi]	= new TF1("pi_pos_Eff", "(x>=0&&x<0.2)*(0.65)+(x>=0.2&&x<[0])*([1]+x*[2])+(x>=[0]&&x<[3])*([4]+[5]*x+[6]*x*x)+(x>=[3])*([7])", 0.0, 20.0);
 	pEffi[pi]->SetParameters(0.4,0.559616,0.634754,1.5,0.710963,0.312747,-0.163094,0.813976);
@@ -161,6 +161,12 @@ int main(int argc, const char **argv) {
     tree->Branch("evNchTrans", &evNchTrans, "evNchTrans/I");
     Int_t evNchTransRec;
     tree->Branch("evNchTransRec", &evNchTransRec, "evNchTransRec/I");
+    Int_t evNchCL;
+    tree->Branch("evNchCL", &evNchCL, "evNchCL/I");
+    Int_t evNchCLRec;
+    tree->Branch("evNchCLRec", &evNchCLRec, "evNchCLRec/I");
+    Int_t evNchV0M;
+    tree->Branch("evNchV0M", &evNchV0M, "evNchV0M/I");
 
 	// Event loop
 	int   nRealEvents = 0;
@@ -178,13 +184,18 @@ int main(int argc, const char **argv) {
 		evPtLeadgen = -1.; evPhiLeadgen = 0; evEtaLeadgen = 0;
 		evPtLeadrec = -1.; evPhiLeadrec = 0; evEtaLeadrec = 0;
 		evNchTrans = -1; evNchTransRec = -1;
+		evNchCL = -1; evNchCLRec = -1;
+		evNchV0M = -1; 
 
 		Int_t nChargedFinal = 0;
 		Int_t nChargedFinalRec = 0;
 		Int_t nTransCh = 0;
 		Int_t nTransChRec = 0;
-		std::vector<Double_t> phis;
-		std::vector<Double_t> phisRec;
+		Int_t nChCL = 0;
+		Int_t nChCLRec = 0;
+		Int_t nChV0M = 0;
+		std::vector<Double_t> angles;
+		std::vector<Double_t> anglesRec;
 		std::vector<Int_t> vecPhiDaughters;
 
 		// Particle loop
@@ -202,9 +213,9 @@ int main(int argc, const char **argv) {
 			TParticle* track =	new( trackArray[nTr++] ) TParticle();
 			track->SetPdgCode(p.id());
 			track->SetFirstMother(p.mother1());
-	  		track->SetLastMother(pythia.event[p.mother1()].id());	// storing mother PDG as last mother :-X
+	  		track->SetLastMother(p.mother2());	
 	  		track->SetFirstDaughter(p.daughter1());
-	  		track->SetLastDaughter(pythia.event[p.daughter1()].id());	
+	  		track->SetLastDaughter(p.daughter2());	
 			track->SetMomentum(p.px(), p.py(), p.pz(), p.e());
 			track->SetProductionVertex(p.xProd(), p.yProd(), p.zProd(), p.tProd());
 
@@ -221,20 +232,26 @@ int main(int argc, const char **argv) {
 			Double_t mcRec = random->Uniform(0.,1.);
 			Bool_t isReco = false;
 			for (int iPdg = 0; iPdg < 3; iPdg++) {	// for pi,k,p only, non-finals need a different approach
-				if (TMath::Abs(p.id())==PDGs[iPdg]) isReco = ( mcRec < pEffi[iPdg]->Eval(p.pT()) );
-				if (TMath::Abs(p.id())==PDGs[k] && TMath::Abs(pythia.event[p.mother1()].id()) == PDGs[phi] )
-					vecPhiDaughters.push_back(nTr-1);
+				if (TMath::Abs(p.id())!=PDGs[iPdg]) continue;
+				isReco = ( mcRec < pEffi[iPdg]->Eval(p.pT()) );
+				isReco = isReco && (TMath::Abs(p.eta())<cutEta);
+				
+				if (iPdg == k && (TMath::Abs(pythia.event[p.mother1()].id()) == PDGs[phi]
+					&& p.mother2() == 0) ) 
+						vecPhiDaughters.push_back(nTr-1);
 			}
 
 			// v0s, cascades (daughters not reconstructable as primary)
 			for (int iPdg = 3; iPdg < partSize-1; iPdg++) {	
 				if (TMath::Abs(PDGs[iPdg])==p.id()) isReco = ( mcRec < pEffi[iPdg]->Eval(p.pT()) );
+				isReco = isReco && (TMath::Abs(p.eta())<cutEta);
 			}
 
 			// resonances (daughters reconstructed as primaries)
 			// done after particle loop
 					
-			track->SetStatus(isReco);
+			if (isReco) track->SetStatusCode(iP);
+			else track->SetStatusCode(-1*(iP));
 
 			// reconstructed
 			Bool_t chargedFinalRec = chargedFinal && isReco;
@@ -246,10 +263,20 @@ int main(int argc, const char **argv) {
 			}
 
 			// calculate multiplicities
+			if (chargedFinal) {
+				if (TMath::Abs(p.eta()) < 0.8) nChCL++;
+			}
+			if (chargedFinalRec) {
+				if (TMath::Abs(p.eta()) < 0.8) nChCLRec++;
+			}
+			if (p.isFinal() && p.isHadron() && p.isCharged()) {
+				if ( (p.eta() > 2.8 && p.eta() < 5.1)
+				|| (p.eta() > -3.7 && p.eta() < -1.7 ) ) nChV0M++;
+			}
 
 			// calculate rt generated
 			if (chargedFinal) {
-				phis.push_back(p.phi());
+				angles.push_back(p.phi());
 				if (p.pT() > evPtLeadgen) {
 					evPtLeadgen = p.pT();
 					evPhiLeadgen = p.phi();
@@ -258,7 +285,7 @@ int main(int argc, const char **argv) {
 			}
 			// calculate rt reconstructed
 			if (chargedFinalRec) {
-				phisRec.push_back(p.phi());
+				anglesRec.push_back(p.phi());
 				if (p.pT() > evPtLeadrec) {
 					evPtLeadrec = p.pT();
 					evPhiLeadrec = p.phi();
@@ -274,10 +301,17 @@ int main(int argc, const char **argv) {
 			Int_t pdgCode = track->GetPdgCode();
 			for (int iPdg = phi; iPdg < partSize; ++iPdg)
 			{
-				if (TMath::Abs(track->GetPdgCode())==PDGs[iPdg])
-				Bool_t isReco = true;
-				for (auto iD : vecPhiDaughters ) isReco = isReco && (TParticle*)trackArray[iD].GetStatus();
-				track.SetStatus(isReco);		// think about this and add some error messages if ndaughters != 2 
+				if (TMath::Abs(track->GetPdgCode())!=PDGs[iPdg]) continue;	// doing this only for phi
+					Bool_t isReco = true;
+					Int_t tracker = 0;
+					for (auto iD : vecPhiDaughters) {	// using a vector to speed things up
+						
+						if (TMath::Abs(track->GetStatusCode()) != ((TParticle*)trackArray[iD])->GetFirstMother()) continue;	// checking if m-d match
+						isReco = isReco && ( ((TParticle*)trackArray[iD])->GetStatusCode() > 0);	// both daughters must be rec.
+						tracker++;
+					}
+					
+					if (tracker==2) track->SetStatusCode(isReco);		// both daughters must be found
 			}
 		}
 
@@ -291,14 +325,17 @@ int main(int argc, const char **argv) {
 			evSo[recNoPt] = TS[recNoPt]->GetTransverseSpherocityTracks();
 		}
 		if (evPtLeadgen > ptLeadCut) {
-			for (auto iPhi : phis) if (IsTrans(iPhi,evPhiLeadgen)) nTransCh++;
+			for (auto iPhi : angles) if (IsTrans(iPhi,evPhiLeadgen)) nTransCh++;
 			evNchTrans = nTransCh;
 		}
 		if (evPtLeadrec > ptLeadCut) {
-			for (auto iPhi : phisRec) if (IsTrans(iPhi,evPhiLeadrec)) nTransChRec++;
+			for (auto iPhi : anglesRec) if (IsTrans(iPhi,evPhiLeadrec)) nTransChRec++;
 			evNchTransRec = nTransChRec;
 		}
-		
+
+		evNchCL = nChCL;
+		evNchCLRec = nChCLRec;
+		evNchV0M = nChV0M;
 		
 		tree->Fill();	// Update tree for this event
 	
