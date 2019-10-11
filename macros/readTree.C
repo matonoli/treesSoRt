@@ -107,31 +107,30 @@ void readTree(Int_t nEvents=100, const Char_t *inputFile="test.list", const Char
     Int_t evNchV0M;
     mChain->SetBranchAddress("evNchV0M", &evNchV0M);
 
-    TH1D* hEvSogen			= new TH1D("hEvSogen","",1000,0.,1.);
-    TH1D* hEvSogenNoPt		= new TH1D("hEvSogenNoPt","",1000,0.,1.);
-    TH1D* hEvNchV0M			= new TH1D("hEvNchV0M","",100, -1, 99);
+    TH1D* hEvSo[TSsize];
+    for (int iTS = 0; iTS < TSsize; ++iTS)	{
+    	hEvSo[iTS]	= new TH1D(Form("hEvSo_%s",TSnames[iTS]),"",1000,0.,1.);
+    }
+	
+	TH1D* hEvNchV0M			= new TH1D("hEvNchV0M","",100, -1, 99);
     TH1D* hTrackPt			= new TH1D("hTrackPt","",500, -1, 25);
 
     int nSoCuts = 6;
-    TH1D* hDPhiSogen[nSoCuts-1]; TH1D* hDPhiSogenNoPt[nSoCuts-1];
-    TH1D* hDPhiSogenNeutral[nSoCuts-1]; TH1D* hDPhiSogenNoPtNeutral[nSoCuts-1];
+    TH1D* hDPhiSo[TSsize][nSoCuts-1];
+    TH1D* hDPhiSoNeutral[TSsize][nSoCuts-1];
     for (int iH = 0; iH < nSoCuts-1; ++iH)	{
-    	hDPhiSogen[iH] = new TH1D(Form("hDPhiSogen_%i",iH),"",200, -3.2, 3.2);
-    	hDPhiSogenNoPt[iH] = new TH1D(Form("hDPhiSogenNoPt_%i",iH),"",200, -3.2, 3.2);
-    	hDPhiSogenNeutral[iH] = new TH1D(Form("hDPhiSogenNeutral_%i",iH),"",200, -3.2, 3.2);
-    	hDPhiSogenNoPtNeutral[iH] = new TH1D(Form("hDPhiSogenNoPtNeutral_%i",iH),"",200, -3.2, 3.2);
-    }
+    for (int iTS = 0; iTS < TSsize; ++iTS)	{
+    	hDPhiSo[iTS][iH]		= new TH1D(Form("hDPhiSo_%s_%i",TSnames[iTS],iH),"",200, -3.2, 3.2);
+    	hDPhiSoNeutral[iTS][iH]	= new TH1D(Form("hDPhiSoNeutral_%s_%i",TSnames[iTS],iH),"",200, -3.2, 3.2);
+    }	}
+
 
     // Calculate spherocity quantiles
-    mChain->Draw("evSogen>>hEvSogen","evSogen>0.","goff");
-    mChain->Draw("evSogenNoPt>>hEvSogenNoPt","evSogenNoPt>0.","goff");
     double quantileValues[] = { 0.0, 0.2, 0.4, 0.6, 0.8, 1.0 };
-    double cutSogen[nSoCuts]; double cutSogenNoPt[nSoCuts];
-    hEvSogen->GetQuantiles(nSoCuts, cutSogen, quantileValues);
-    hEvSogenNoPt->GetQuantiles(nSoCuts, cutSogenNoPt, quantileValues);
-    for (int i = 0; i < 6; ++i)
-    {
-    	printf("values for %i are %f and %f \n", i, cutSogen[i], cutSogenNoPt[i]);
+    double cutSo[TSsize][nSoCuts];
+    for (int iTS = 0; iTS < TSsize; ++iTS)	{
+    	mChain->Draw(Form("evSo%s>>hEvSo_%s",TSnames[iTS],TSnames[iTS]),Form("evSo%s>0.",TSnames[iTS]),"goff");
+    	hEvSo[iTS]->GetQuantiles(nSoCuts, cutSo[iTS], quantileValues);
     }
 
 	nEvents = (nEvents < mChain->GetEntries() && nEvents > 0) ? nEvents : mChain->GetEntries();
@@ -142,6 +141,8 @@ void readTree(Int_t nEvents=100, const Char_t *inputFile="test.list", const Char
 
 		hEvNchV0M->Fill(evNchV0M);
 
+		if (evNchCLRec < 27) continue;
+		if (evSo[rec] < 0 && evSo[recNoPt] < 0) continue;
 		if (evSo[gen] < 0 && evSo[genNoPt] < 0) continue;
 
 		Int_t nTracks = tracks->GetEntriesFast();
@@ -161,60 +162,79 @@ void readTree(Int_t nEvents=100, const Char_t *inputFile="test.list", const Char
 				Double_t dPhi = DeltaPhi(t->Phi(), t2->Phi());
 				
 				for (int iSC = 0; iSC < nSoCuts-1; ++iSC)	{
+				for (int iTS = 0; iTS < TSsize; ++iTS)	{
 					
-					if (evSo[gen] > cutSogen[iSC] && evSo[gen] < cutSogen[iSC+1]
+					if (evSo[iTS] > cutSo[iTS][iSC] && evSo[iTS] < cutSo[iTS][iSC+1]
 						&& isCharged1 && isCharged2)
-						hDPhiSogen[iSC]->Fill(dPhi);
+						hDPhiSo[iTS][iSC]->Fill(dPhi);
 
-					if (evSo[genNoPt] > cutSogenNoPt[iSC] && evSo[genNoPt] < cutSogenNoPt[iSC+1]
-						&& isCharged1 && isCharged2)
-						hDPhiSogenNoPt[iSC]->Fill(dPhi);
-
-					if (evSo[gen] > cutSogen[iSC] && evSo[gen] < cutSogen[iSC+1]
-						&& !isCharged1 && !isCharged2)
-						hDPhiSogenNeutral[iSC]->Fill(dPhi);
-
-					if (evSo[genNoPt] > cutSogenNoPt[iSC] && evSo[genNoPt] < cutSogenNoPt[iSC+1]
-						&& !isCharged1 && !isCharged2)
-						hDPhiSogenNoPtNeutral[iSC]->Fill(dPhi);
-				}
+					if (evSo[iTS] > cutSo[iTS][iSC] && evSo[iTS] < cutSo[iTS][iSC+1]
+						&& !isCharged1 && !isCharged2 && t->GetPdgCode()!=22 && t2->GetPdgCode()!=22)
+						hDPhiSoNeutral[iTS][iSC]->Fill(dPhi);
+				}	}
 			}
 		}
 
 	}
 
 	for (int iH = 0; iH < nSoCuts-1; ++iH)	{
-		hDPhiSogen[iH]->Scale(1./hDPhiSogen[iH]->Integral());
-    	hDPhiSogenNoPt[iH]->Scale(1./hDPhiSogenNoPt[iH]->Integral());
-    	hDPhiSogenNeutral[iH]->Scale(1./hDPhiSogenNeutral[iH]->Integral());
-    	hDPhiSogenNoPtNeutral[iH]->Scale(1./hDPhiSogenNoPtNeutral[iH]->Integral());
-    }
+	for (int iTS = 0; iTS < TSsize; ++iTS)	{
+		hDPhiSo[iTS][iH]->Scale(1./hDPhiSo[iTS][iH]->Integral());
+    	hDPhiSoNeutral[iTS][iH]->Scale(1./hDPhiSoNeutral[iTS][iH]->Integral());
+    }	}
 
-    TCanvas* cSo = new TCanvas("cSo","",900, 900);
-    cSo->Divide(2,2,1e-04,1e-04);
-    cSo->cd(1);
+    TCanvas* cSo_gen = new TCanvas("cSo_gen","",900, 900);
+    cSo_gen->Divide(2,2,1e-04,1e-04);
+    cSo_gen->cd(1);
     for (int iH = 0; iH < nSoCuts-1; ++iH)	{
-		hDPhiSogen[iH]->SetLineColor(2+iH);
-		if (!iH) hDPhiSogen[iH]->Draw();
-		else hDPhiSogen[iH]->Draw("same");
+		hDPhiSo[gen][iH]->SetLineColor(2+iH);
+		if (!iH) hDPhiSo[gen][iH]->Draw();
+		else hDPhiSo[gen][iH]->Draw("same");
 	}
-	cSo->cd(2);
+	cSo_gen->cd(2);
     for (int iH = 0; iH < nSoCuts-1; ++iH)	{
-		hDPhiSogenNoPt[iH]->SetLineColor(2+iH);
-		if (!iH) hDPhiSogenNoPt[iH]->Draw();
-		else hDPhiSogenNoPt[iH]->Draw("same");
+		hDPhiSo[genNoPt][iH]->SetLineColor(2+iH);
+		if (!iH) hDPhiSo[genNoPt][iH]->Draw();
+		else hDPhiSo[genNoPt][iH]->Draw("same");
 	}
-	cSo->cd(3);
+	cSo_gen->cd(3);
     for (int iH = 0; iH < nSoCuts-1; ++iH)	{
-		hDPhiSogenNeutral[iH]->SetLineColor(2+iH);
-		if (!iH) hDPhiSogenNeutral[iH]->Draw();
-		else hDPhiSogenNeutral[iH]->Draw("same");
+		hDPhiSoNeutral[gen][iH]->SetLineColor(2+iH);
+		if (!iH) hDPhiSoNeutral[gen][iH]->Draw();
+		else hDPhiSoNeutral[gen][iH]->Draw("same");
 	}
-	cSo->cd(4);
+	cSo_gen->cd(4);
     for (int iH = 0; iH < nSoCuts-1; ++iH)	{
-		hDPhiSogenNoPtNeutral[iH]->SetLineColor(2+iH);
-		if (!iH) hDPhiSogenNoPtNeutral[iH]->Draw();
-		else hDPhiSogenNoPtNeutral[iH]->Draw("same");
+		hDPhiSoNeutral[genNoPt][iH]->SetLineColor(2+iH);
+		if (!iH) hDPhiSoNeutral[genNoPt][iH]->Draw();
+		else hDPhiSoNeutral[genNoPt][iH]->Draw("same");
+	}
+	
+	TCanvas* cSo_rec = new TCanvas("cSo_rec","",900, 900);
+    cSo_rec->Divide(2,2,1e-04,1e-04);
+    cSo_rec->cd(1);
+    for (int iH = 0; iH < nSoCuts-1; ++iH)	{
+		hDPhiSo[rec][iH]->SetLineColor(2+iH);
+		if (!iH) hDPhiSo[rec][iH]->Draw();
+		else hDPhiSo[rec][iH]->Draw("same");
+	}
+	cSo_rec->cd(2);
+    for (int iH = 0; iH < nSoCuts-1; ++iH)	{
+		hDPhiSo[recNoPt][iH]->SetLineColor(2+iH);
+		if (!iH) hDPhiSo[recNoPt][iH]->Draw();
+		else hDPhiSo[recNoPt][iH]->Draw("same");
+	}
+	cSo_rec->cd(3);
+    for (int iH = 0; iH < nSoCuts-1; ++iH)	{
+		hDPhiSoNeutral[rec][iH]->SetLineColor(2+iH);
+		if (!iH) hDPhiSoNeutral[rec][iH]->Draw();
+		else hDPhiSoNeutral[rec][iH]->Draw("same");
+	}
+	cSo_rec->cd(4);
+    for (int iH = 0; iH < nSoCuts-1; ++iH)	{
+		hDPhiSoNeutral[recNoPt][iH]->SetLineColor(2+iH);
+		if (!iH) hDPhiSoNeutral[recNoPt][iH]->Draw();
+		else hDPhiSoNeutral[recNoPt][iH]->Draw("same");
 	}
 
 
