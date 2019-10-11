@@ -7,6 +7,7 @@
 #include <TROOT.h>
 #include <TParticlePDG.h>
 #include <TCanvas.h>
+#include <TLegend.h>
 
 #include <iostream>
 #include <fstream>
@@ -63,6 +64,34 @@ double DeltaPhi(Double_t phi1, Double_t phi2) {
 	return dphi;
 }
 
+void MakeNiceHistogram(TH1D* h, Int_t col) {
+
+	h->SetLineWidth(2);
+	h->SetLineColor(col);
+	h->SetMarkerStyle(20);
+	h->SetMarkerSize(1.3);
+	h->SetMarkerColor(col);
+	h->SetStats(0);
+
+	h->GetYaxis()->SetTitleOffset(1.1);
+	h->GetYaxis()->SetLabelOffset(0.0025);
+	h->GetYaxis()->SetLabelSize(0.03);
+
+	//h->SetTopMargin(0.055);
+}
+
+void MakeNiceLegend(TLegend *leg, Float_t size, Int_t columns)	{
+	leg->SetTextFont(42);
+	leg->SetBorderSize(0);
+	leg->SetFillStyle(0);
+	leg->SetFillColor(0);
+	leg->SetMargin(0.25);
+	leg->SetTextSize(size);
+	leg->SetEntrySeparation(0.5);
+	leg->SetNColumns(columns);
+
+}
+
 void readTree(Int_t nEvents=100, const Char_t *inputFile="test.list", const Char_t *outputFile="test.root") {
 
 	gROOT->ProcessLine(".x load_libraries.C");
@@ -116,12 +145,13 @@ void readTree(Int_t nEvents=100, const Char_t *inputFile="test.list", const Char
     TH1D* hTrackPt			= new TH1D("hTrackPt","",500, -1, 25);
 
     int nSoCuts = 6;
+    Int_t clrs[nSoCuts-1] = { kRed, kBlue, kGreen+2, kOrange+10, kMagenta};
     TH1D* hDPhiSo[TSsize][nSoCuts-1];
     TH1D* hDPhiSoNeutral[TSsize][nSoCuts-1];
     for (int iH = 0; iH < nSoCuts-1; ++iH)	{
     for (int iTS = 0; iTS < TSsize; ++iTS)	{
-    	hDPhiSo[iTS][iH]		= new TH1D(Form("hDPhiSo_%s_%i",TSnames[iTS],iH),"",200, -3.2, 3.2);
-    	hDPhiSoNeutral[iTS][iH]	= new TH1D(Form("hDPhiSoNeutral_%s_%i",TSnames[iTS],iH),"",200, -3.2, 3.2);
+    	hDPhiSo[iTS][iH]		= new TH1D(Form("hDPhiSo_%s_%i",TSnames[iTS],iH),"",100, -3.2, 3.2);
+    	hDPhiSoNeutral[iTS][iH]	= new TH1D(Form("hDPhiSoNeutral_%s_%i",TSnames[iTS],iH),"",100, -3.2, 3.2);
     }	}
 
 
@@ -183,57 +213,90 @@ void readTree(Int_t nEvents=100, const Char_t *inputFile="test.list", const Char
     	hDPhiSoNeutral[iTS][iH]->Scale(1./hDPhiSoNeutral[iTS][iH]->Integral());
     }	}
 
+    TLegend* l1 = new TLegend(0.15,0.75,0.75,0.88);
+    MakeNiceLegend(l1,0.037,2);
     TCanvas* cSo_gen = new TCanvas("cSo_gen","",900, 900);
     cSo_gen->Divide(2,2,1e-04,1e-04);
     cSo_gen->cd(1);
     for (int iH = 0; iH < nSoCuts-1; ++iH)	{
-		hDPhiSo[gen][iH]->SetLineColor(2+iH);
-		if (!iH) hDPhiSo[gen][iH]->Draw();
+		MakeNiceHistogram(hDPhiSo[gen][iH],clrs[iH]);
+		if (!iH) {	
+			hDPhiSo[gen][iH]->Draw();
+			hDPhiSo[gen][iH]->GetYaxis()->SetRangeUser(0.0094,0.0110);
+			hDPhiSo[gen][iH]->GetYaxis()->SetTitle("a.u.");	
+		}
 		else hDPhiSo[gen][iH]->Draw("same");
 	}
+
 	cSo_gen->cd(2);
     for (int iH = 0; iH < nSoCuts-1; ++iH)	{
-		hDPhiSo[genNoPt][iH]->SetLineColor(2+iH);
-		if (!iH) hDPhiSo[genNoPt][iH]->Draw();
+		MakeNiceHistogram(hDPhiSo[genNoPt][iH],clrs[iH]);
+		if (!iH) {	
+			hDPhiSo[genNoPt][iH]->Draw();
+			hDPhiSo[genNoPt][iH]->GetYaxis()->SetRangeUser(0.0094,0.0110);
+			hDPhiSo[genNoPt][iH]->GetYaxis()->SetTitle("a.u.");	
+		}
 		else hDPhiSo[genNoPt][iH]->Draw("same");
 	}
 	cSo_gen->cd(3);
     for (int iH = 0; iH < nSoCuts-1; ++iH)	{
-		hDPhiSoNeutral[gen][iH]->SetLineColor(2+iH);
-		if (!iH) hDPhiSoNeutral[gen][iH]->Draw();
+		MakeNiceHistogram(hDPhiSoNeutral[gen][iH],clrs[iH]);
+		if (!iH) {	
+			hDPhiSoNeutral[gen][iH]->Draw();
+			hDPhiSoNeutral[gen][iH]->GetYaxis()->SetRangeUser(0.0094,0.0110);
+			hDPhiSoNeutral[gen][iH]->GetYaxis()->SetTitle("a.u.");	
+		}
 		else hDPhiSoNeutral[gen][iH]->Draw("same");
 	}
 	cSo_gen->cd(4);
     for (int iH = 0; iH < nSoCuts-1; ++iH)	{
-		hDPhiSoNeutral[genNoPt][iH]->SetLineColor(2+iH);
-		if (!iH) hDPhiSoNeutral[genNoPt][iH]->Draw();
+		MakeNiceHistogram(hDPhiSoNeutral[genNoPt][iH],clrs[iH]);
+		if (!iH) {	
+			hDPhiSoNeutral[genNoPt][iH]->Draw();
+			hDPhiSoNeutral[genNoPt][iH]->GetYaxis()->SetRangeUser(0.0094,0.0110);
+			hDPhiSoNeutral[genNoPt][iH]->GetYaxis()->SetTitle("a.u.");	
+			}
 		else hDPhiSoNeutral[genNoPt][iH]->Draw("same");
+		//l1->AddEntry(hDPhiSoNeutral[genNoPt][iH],Form("%2.0f - %2.0f", quantileValues[iH],quantileValues[iH+1]),"l");
 	}
-	
+	//l1->Draw();
+
 	TCanvas* cSo_rec = new TCanvas("cSo_rec","",900, 900);
     cSo_rec->Divide(2,2,1e-04,1e-04);
     cSo_rec->cd(1);
     for (int iH = 0; iH < nSoCuts-1; ++iH)	{
-		hDPhiSo[rec][iH]->SetLineColor(2+iH);
-		if (!iH) hDPhiSo[rec][iH]->Draw();
+		MakeNiceHistogram(hDPhiSo[rec][iH],clrs[iH]);
+		if (!iH) {	
+			hDPhiSo[rec][iH]->Draw();
+			hDPhiSo[rec][iH]->GetYaxis()->SetRangeUser(0.0094,0.0110);
+			hDPhiSo[rec][iH]->GetYaxis()->SetTitle("a.u.");	}
 		else hDPhiSo[rec][iH]->Draw("same");
 	}
 	cSo_rec->cd(2);
     for (int iH = 0; iH < nSoCuts-1; ++iH)	{
-		hDPhiSo[recNoPt][iH]->SetLineColor(2+iH);
-		if (!iH) hDPhiSo[recNoPt][iH]->Draw();
+		MakeNiceHistogram(hDPhiSo[recNoPt][iH],clrs[iH]);
+		if (!iH) {	
+			hDPhiSo[recNoPt][iH]->Draw();
+			hDPhiSo[recNoPt][iH]->GetYaxis()->SetRangeUser(0.0094,0.0110);
+			hDPhiSo[recNoPt][iH]->GetYaxis()->SetTitle("a.u.");	}
 		else hDPhiSo[recNoPt][iH]->Draw("same");
 	}
 	cSo_rec->cd(3);
     for (int iH = 0; iH < nSoCuts-1; ++iH)	{
-		hDPhiSoNeutral[rec][iH]->SetLineColor(2+iH);
-		if (!iH) hDPhiSoNeutral[rec][iH]->Draw();
+		MakeNiceHistogram(hDPhiSoNeutral[rec][iH],clrs[iH]);
+		if (!iH) {	
+			hDPhiSoNeutral[rec][iH]->Draw();
+			hDPhiSoNeutral[rec][iH]->GetYaxis()->SetRangeUser(0.0094,0.0110);
+			hDPhiSoNeutral[rec][iH]->GetYaxis()->SetTitle("a.u.");	}
 		else hDPhiSoNeutral[rec][iH]->Draw("same");
 	}
 	cSo_rec->cd(4);
     for (int iH = 0; iH < nSoCuts-1; ++iH)	{
-		hDPhiSoNeutral[recNoPt][iH]->SetLineColor(2+iH);
-		if (!iH) hDPhiSoNeutral[recNoPt][iH]->Draw();
+		MakeNiceHistogram(hDPhiSoNeutral[recNoPt][iH],clrs[iH]);
+		if (!iH) {	
+			hDPhiSoNeutral[recNoPt][iH]->Draw();
+			hDPhiSoNeutral[recNoPt][iH]->GetYaxis()->SetRangeUser(0.0094,0.0110);
+			hDPhiSoNeutral[recNoPt][iH]->GetYaxis()->SetTitle("a.u.");	}
 		else hDPhiSoNeutral[recNoPt][iH]->Draw("same");
 	}
 
